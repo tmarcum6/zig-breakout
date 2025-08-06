@@ -37,7 +37,7 @@ fn handle_paddle_input(paddle: *Paddle) void {
     }
 }
 
-fn handle_ball_movement(ball: *Ball, paddle: *Paddle, comptime screenWidth: i32, comptime screenHeight: i32) void {
+fn handle_ball_movement(ball: *Ball, paddle: *Paddle, comptime screenWidth: i32, comptime screenHeight: i32, score: *i32) void {
     ball.x += ball.dx;
     ball.y += ball.dy;
 
@@ -53,6 +53,7 @@ fn handle_ball_movement(ball: *Ball, paddle: *Paddle, comptime screenWidth: i32,
         ball.y = screenHeight / 2;
         ball.dx = 2;
         ball.dy = -2;
+        reset_score(score);
     }
 
     if (ball.x + ball.radius <= paddle.x + paddle.width and
@@ -123,6 +124,11 @@ fn update_score(score: *i32) void {
     score.* += 1;
 }
 
+fn reset_score(score: *i32) void {
+    score.* = 0;
+    std.debug.print("Score reset to 0\n", .{});
+}
+
 fn draw_score(score: *i32) void {
     rl.drawText(rl.textFormat("Score: %08i", .{score.*}), 0, 0, 20, rl.Color.white);
 }
@@ -172,7 +178,7 @@ pub fn main() !void {
 
         handle_paddle_input(&paddle);
 
-        handle_ball_movement(&ball, &paddle, screenWidth, screenHeight);
+        handle_ball_movement(&ball, &paddle, screenWidth, screenHeight, &score);
 
         draw_bricks(bricks);
         handle_brick_collision(&bricks, &ball, &score);
