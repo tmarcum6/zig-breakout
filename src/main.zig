@@ -37,7 +37,7 @@ fn handle_paddle_input(paddle: *Paddle) void {
     }
 }
 
-fn handle_ball_movement(ball: *Ball, paddle: *Paddle, comptime screenWidth: i32, comptime screenHeight: i32, score: *i32) void {
+fn handle_ball_movement(ball: *Ball, paddle: *Paddle, comptime screenWidth: i32, comptime screenHeight: i32, bricks: []Brick, score: *i32, lives: *i32) void {
     ball.x += ball.dx;
     ball.y += ball.dy;
 
@@ -49,11 +49,7 @@ fn handle_ball_movement(ball: *Ball, paddle: *Paddle, comptime screenWidth: i32,
     }
 
     if (ball.y >= screenHeight) {
-        ball.x = screenWidth / 2;
-        ball.y = screenHeight / 2;
-        ball.dx = 2;
-        ball.dy = -2;
-        reset_score(score);
+        reset_game(paddle, ball, bricks, screenWidth, screenHeight, score, lives);
     }
 
     if (ball.x + ball.radius <= paddle.x + paddle.width and
@@ -62,6 +58,33 @@ fn handle_ball_movement(ball: *Ball, paddle: *Paddle, comptime screenWidth: i32,
         ball.y - ball.radius <= paddle.y + paddle.height)
     {
         ball.dy *= -1;
+    }
+}
+
+fn reset_game(paddle: *Paddle, ball: *Ball, bricks: []Brick, comptime screenWidth: i32, comptime screenHeight: i32, score: *i32, lives: *i32) void {
+    paddle.* = Paddle{
+        .x = screenWidth / 2 - 100,
+        .y = screenHeight / 2 + 200,
+        .width = 200,
+        .height = 20,
+        .color = .light_gray,
+    };
+
+    ball.* = Ball{
+        .x = screenWidth / 2,
+        .y = screenHeight / 2,
+        .radius = 5.0,
+        .dx = 2,
+        .dy = -2,
+        .color = .red,
+    };
+
+    if (lives.* <= 0) {
+        lives.* = 3;
+        score.* = 0;
+        handle_brick_generation(bricks);
+    } else {
+        lives.* -= 1;
     }
 }
 
@@ -124,14 +147,25 @@ fn update_score(score: *i32) void {
     score.* += 1;
 }
 
-fn reset_score(score: *i32) void {
+fn reset_score(score: *i32, lives: *i32) void {
     score.* = 0;
-    std.debug.print("Score reset to 0\n", .{});
+    lives.* -= 1;
 }
 
 fn draw_score(score: *i32) void {
     rl.drawText(rl.textFormat("Score: %08i", .{score.*}), 0, 0, 20, rl.Color.white);
 }
+
+fn draw_lives(lives: *i32) void {
+    rl.drawText(rl.textFormat("Lives: %08i", .{lives.*}), 240, 240, 20, rl.Color.white);
+}
+
+const GameState = enum {
+    MainMenu,
+    Playing,
+    Paused,
+    GameOver,
+};
 
 pub fn main() !void {
     const screenWidth = 800;
@@ -167,22 +201,63 @@ pub fn main() !void {
 
     handle_brick_generation(bricks);
 
+    var game_state: GameState = .MainMenu;
+    var lives: i32 = 3;
+
     while (!rl.windowShouldClose()) {
         rl.beginDrawing();
         defer rl.endDrawing();
 
         rl.clearBackground(.black);
 
-        rl.drawRectangle(@intFromFloat(paddle.x), @intFromFloat(paddle.y), @intFromFloat(paddle.width), @intFromFloat(paddle.height), paddle.color);
-        rl.drawCircle(@intFromFloat(ball.x), @intFromFloat(ball.y), ball.radius, ball.color);
+        switch (game_state) {
+            .MainMenu => {
+                rl.drawText("BREAKOUT", 260, 150, 40, rl.Color.red);
+                rl.drawText("Press ENTER to start", 240, 250, 20, rl.Color.white);
 
-        handle_paddle_input(&paddle);
+                if (rl.isKeyPressed(.enter)) {
+                    game_state = .Playing;
+                }
 
-        handle_ball_movement(&ball, &paddle, screenWidth, screenHeight, &score);
+                reset_game(&paddle, &ball, bricks, screenWidth, screenHeight, &score, &lives);
+            },
+            .Playing => {
+                draw_score(&score);
+                draw_lives(&lives);
 
-        draw_bricks(bricks);
-        handle_brick_collision(&bricks, &ball, &score);
+                rl.drawRectangle(@intFromFloat(paddle.x), @intFromFloat(paddle.y), @intFromFloat(paddle.width), @intFromFloat(paddle.height), paddle.color);
+                rl.drawCircle(@intFromFloat(ball.x), @intFromFloat(ball.y), ball.radius, ball.color);
 
-        draw_score(&score);
+                handle_paddle_input(&paddle);
+
+                handle_ball_movement(&ball, &paddle, screenWidth, screenHeight, bricks, &score, &lives);
+
+                draw_bricks(bricks);
+                handle_brick_collision(&bricks, &ball, &score);
+
+                if (lives <= 0) {
+                    game_state = .GameOver;
+                }
+                if (rl.isKeyPressed(.enter)) {
+                    game_state = .Paused;
+                }
+            },
+            .Paused => {
+                rl.drawText("PAUSED", 260, 150, 40, rl.Color.red);
+                rl.drawText("Press ENTER to resume", 240, 250, 20, rl.Color.white);
+                rl.drawText("Press Q to quit", 240, 250, 20, rl.Color.white);
+
+                if (rl.isKeyPressed(.enter)) {
+                    game_state = .Playing;
+                }
+            },
+            .GameOver => {
+                rl.drawText("GAME OVER", 260, 150, 40, rl.Color.red);
+                rl.drawText("Press ENTER to return to menu", 240, 250, 20, rl.Color.white);
+                if (rl.isKeyPressed(.enter)) {
+                    game_state = .MainMenu;
+                }
+            },
+        }
     }
 }
