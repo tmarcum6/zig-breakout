@@ -165,6 +165,7 @@ const GameState = enum {
     Playing,
     Paused,
     GameOver,
+    GameWon,
 };
 
 pub fn main() !void {
@@ -197,6 +198,9 @@ pub fn main() !void {
     var bricks = try allocator.alloc(Brick, 30);
     defer allocator.free(bricks);
 
+    //   const texture = rl.loadTexture("assets/dungeon_sheet.png");
+    //    defer rl.unloadTexture(texture);
+
     var score: i32 = 0;
 
     handle_brick_generation(bricks);
@@ -225,6 +229,8 @@ pub fn main() !void {
                 draw_score(&score);
                 draw_lives(&lives);
 
+                //                rl.drawTexture(texture, 0, 0, rl.Color.white);
+
                 rl.drawRectangle(@intFromFloat(paddle.x), @intFromFloat(paddle.y), @intFromFloat(paddle.width), @intFromFloat(paddle.height), paddle.color);
                 rl.drawCircle(@intFromFloat(ball.x), @intFromFloat(ball.y), ball.radius, ball.color);
 
@@ -233,13 +239,26 @@ pub fn main() !void {
                 handle_ball_movement(&ball, &paddle, screenWidth, screenHeight, bricks, &score, &lives);
 
                 draw_bricks(bricks);
+
                 handle_brick_collision(&bricks, &ball, &score);
+
+                if (score == bricks.len) {
+                    game_state = .GameWon;
+                }
 
                 if (lives <= 0) {
                     game_state = .GameOver;
                 }
+
                 if (rl.isKeyPressed(.enter)) {
                     game_state = .Paused;
+                }
+            },
+            .GameWon => {
+                rl.drawText("GAME WON", 260, 150, 40, rl.Color.green);
+                rl.drawText("Press ENTER to return to menu", 240, 250, 20, rl.Color.white);
+                if (rl.isKeyPressed(.enter)) {
+                    game_state = .MainMenu;
                 }
             },
             .Paused => {
